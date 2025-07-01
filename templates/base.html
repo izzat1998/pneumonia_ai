@@ -1,0 +1,419 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>{% block title %}Pneumonia AI Detection{% endblock %}</title>
+    
+    <!-- Google Fonts for Professional Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap 5.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css">
+    
+    <!-- Professional Medical Framework CSS -->
+    <link rel="stylesheet" href="{% static 'css/medical-framework.css' %}">
+    
+    <!-- Legacy Custom CSS (to be deprecated) -->
+    <style>
+        :root {
+            --medical-blue: #0066cc;
+            --medical-green: #28a745;
+            --medical-red: #dc3545;
+            --medical-light: #f8f9fa;
+            --medical-dark: #343a40;
+        }
+        
+        body {
+            background-color: var(--medical-light);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar-brand {
+            font-weight: 600;
+            color: var(--medical-blue) !important;
+        }
+        
+        .hero-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4rem 0;
+        }
+        
+        .upload-area {
+            border: 3px dashed #dee2e6;
+            border-radius: 15px;
+            padding: 3rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: white;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover,
+        .upload-area.dragover {
+            border-color: var(--medical-blue);
+            background-color: #f0f8ff;
+            transform: translateY(-2px);
+        }
+        
+        .upload-area.processing {
+            border-color: var(--medical-green);
+            background-color: #f0fff0;
+        }
+        
+        .result-card {
+            background: white;
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .result-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .confidence-bar {
+            height: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .btn-medical {
+            background: var(--medical-blue);
+            border: none;
+            border-radius: 25px;
+            padding: 12px 30px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-medical:hover {
+            background: #0052a3;
+            transform: translateY(-2px);
+        }
+        
+        .stats-card {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .loading-spinner {
+            display: none;
+        }
+        
+        .image-preview {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 10px;
+            margin: 1rem 0;
+        }
+        
+        .analysis-history {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .footer {
+            background: var(--medical-dark);
+            color: white;
+            padding: 2rem 0;
+            margin-top: 4rem;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Professional Medical Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm border-bottom border-primary border-2">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <div class="medical-brand-icon me-3">
+                    <i class="bi bi-lungs" style="font-size: 2rem; color: var(--medical-primary);"></i>
+                </div>
+                <div>
+                    <div class="medical-heading-3 mb-0" style="font-size: 1.5rem; font-weight: 700; color: var(--medical-primary);">PneumoniaAI</div>
+                    <small class="medical-caption" style="color: var(--medical-gray-500); font-size: 0.8rem;">Professional Medical Analysis</small>
+                </div>
+            </a>
+            
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link medical-nav-link" href="/">
+                            <i class="bi bi-house-door me-2"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link medical-nav-link" href="#analysis">
+                            <i class="bi bi-cpu me-2"></i>
+                            <span>Analysis</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link medical-nav-link" href="#history">
+                            <i class="bi bi-clock-history me-2"></i>
+                            <span>History</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link medical-nav-link" href="#stats">
+                            <i class="bi bi-graph-up me-2"></i>
+                            <span>Statistics</span>
+                        </a>
+                    </li>
+                    <li class="nav-item ms-3">
+                        <a class="medical-btn medical-btn-sm medical-btn-primary" href="#upload">
+                            <i class="bi bi-cloud-upload me-2"></i>
+                            Start Analysis
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    {% block content %}{% endblock %}
+
+    <!-- Professional Medical Footer -->
+    <footer class="footer" style="background: linear-gradient(135deg, var(--medical-primary-dark) 0%, var(--medical-primary) 100%); border-top: 4px solid var(--medical-primary);">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <div class="d-flex align-items-center mb-3">
+                        <i class="bi bi-lungs" style="font-size: 2rem; color: var(--medical-accent); margin-right: 1rem;"></i>
+                        <div>
+                            <h5 class="text-white mb-1">PneumoniaAI Professional</h5>
+                            <p class="mb-0" style="color: rgba(255,255,255,0.8); font-size: 0.9rem;">Advanced AI-powered pneumonia detection using chest X-ray analysis with medical-grade accuracy.</p>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-3">
+                        <div class="badge" style="background: rgba(255,255,255,0.2); color: white; padding: 0.5rem 1rem;">
+                            <i class="bi bi-shield-check me-2"></i>Medical Grade
+                        </div>
+                        <div class="badge" style="background: rgba(255,255,255,0.2); color: white; padding: 0.5rem 1rem;">
+                            <i class="bi bi-cpu me-2"></i>AI-Powered
+                        </div>
+                        <div class="badge" style="background: rgba(255,255,255,0.2); color: white; padding: 0.5rem 1rem;">
+                            <i class="bi bi-speedometer2 me-2"></i>Real-time
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <div class="medical-card" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); padding: 1.5rem;">
+                        <h6 class="text-white mb-3">System Information</h6>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span style="color: rgba(255,255,255,0.8);">Framework:</span>
+                            <span class="text-white fw-bold">PyTorch 2.7</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span style="color: rgba(255,255,255,0.8);">Backend:</span>
+                            <span class="text-white fw-bold">Django 5.2</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span style="color: rgba(255,255,255,0.8);">Version:</span>
+                            <span class="text-white fw-bold">v2.0.0</span>
+                        </div>
+                        <div class="text-center">
+                            <small style="color: rgba(255,255,255,0.7);">
+                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                For research and educational purposes only
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <hr style="border-color: rgba(255,255,255,0.2); margin: 2rem 0 1rem 0;">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <p class="mb-0" style="color: rgba(255,255,255,0.7); font-size: 0.85rem;">
+                        © 2024 PneumoniaAI Professional. All rights reserved.
+                    </p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <div class="d-flex justify-content-md-end gap-3">
+                        <a href="#" class="text-white text-decoration-none">
+                            <i class="bi bi-question-circle me-1"></i>Help
+                        </a>
+                        <a href="#" class="text-white text-decoration-none">
+                            <i class="bi bi-file-text me-1"></i>Documentation
+                        </a>
+                        <a href="#" class="text-white text-decoration-none">
+                            <i class="bi bi-github me-1"></i>GitHub
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Professional Medical Notification Container (Managed by MedicalCore) -->
+    <div class="medical-notification-container"></div>
+
+    <!-- Legacy Toast Container (for compatibility) -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="notificationToast" class="toast" role="alert">
+            <div class="toast-header">
+                <i class="bi bi-info-circle text-primary me-2"></i>
+                <strong class="me-auto">Notification</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body"></div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5.3 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Chart.js for Advanced Data Visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    
+    <!-- Professional Medical Core JavaScript -->
+    <script src="{% static 'js/medical-core.js' %}"></script>
+    <script src="{% static 'js/pneumonia-analyzer.js' %}"></script>
+    
+    <!-- Legacy Custom JavaScript (to be deprecated) -->
+    <script>
+        // Global JavaScript utilities
+        class PneumoniaAI {
+            constructor() {
+                this.apiBase = '/api';
+                this.csrfToken = this.getCSRFToken();
+            }
+
+            getCSRFToken() {
+                // Try multiple methods to get CSRF token
+                let token = '';
+                
+                // Method 1: From meta tag
+                const metaTag = document.querySelector('meta[name="csrf-token"]');
+                if (metaTag) {
+                    token = metaTag.getAttribute('content');
+                }
+                
+                // Method 2: From cookies
+                if (!token) {
+                    const cookies = document.cookie.split(';');
+                    for (let cookie of cookies) {
+                        const [name, value] = cookie.trim().split('=');
+                        if (name === 'csrftoken') {
+                            token = value;
+                            break;
+                        }
+                    }
+                }
+                
+                // Method 3: From Django template variable (if available)
+                if (!token && typeof window.csrfToken !== 'undefined') {
+                    token = window.csrfToken;
+                }
+                
+                return token;
+            }
+
+            showToast(message, type = 'info') {
+                const toast = document.getElementById('notificationToast');
+                const toastBody = toast.querySelector('.toast-body');
+                const toastHeader = toast.querySelector('.toast-header i');
+                
+                toastBody.textContent = message;
+                
+                // Update icon based on type
+                toastHeader.className = `bi me-2`;
+                switch(type) {
+                    case 'success':
+                        toastHeader.classList.add('bi-check-circle', 'text-success');
+                        break;
+                    case 'error':
+                        toastHeader.classList.add('bi-exclamation-triangle', 'text-danger');
+                        break;
+                    case 'warning':
+                        toastHeader.classList.add('bi-exclamation-circle', 'text-warning');
+                        break;
+                    default:
+                        toastHeader.classList.add('bi-info-circle', 'text-primary');
+                }
+                
+                const bsToast = new bootstrap.Toast(toast);
+                bsToast.show();
+            }
+
+            async apiCall(endpoint, options = {}) {
+                const url = `${this.apiBase}${endpoint}`;
+                const defaultOptions = {
+                    headers: {
+                        'X-CSRFToken': this.csrfToken,
+                    }
+                };
+
+                const response = await fetch(url, { ...defaultOptions, ...options });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.message || `HTTP ${response.status}`);
+                }
+
+                return await response.json();
+            }
+
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            formatConfidence(score) {
+                return (score * 100).toFixed(1) + '%';
+            }
+
+            formatTimestamp(timestamp) {
+                return new Date(timestamp).toLocaleString();
+            }
+        }
+
+        // Initialize global app instance
+        window.app = new PneumoniaAI();
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

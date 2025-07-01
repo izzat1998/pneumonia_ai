@@ -1,0 +1,15 @@
+# Medical-grade model requirements
+# Add these to your existing requirements.txt
+
+# TorchXRayVision - Medical chest X-ray models
+torchxrayvision>=1.0.0
+
+# Hugging Face Transformers for medical ViT model
+transformers>=4.17.0
+
+# Additional medical image processing
+scikit-image>=0.19.0
+SimpleITK>=2.2.0  # For advanced medical image processing
+
+# Optional: For DICOM support (if needed later)
+pydicom>=2.3.0
