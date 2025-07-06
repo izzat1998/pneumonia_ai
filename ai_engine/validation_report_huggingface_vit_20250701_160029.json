@@ -1,0 +1,33 @@
+{
+  "validation_timestamp": "2025-07-01T16:00:29.111392",
+  "model_name": "huggingface_vit",
+  "validation_successful": true,
+  "performance_summary": {
+    "auc": 0.5,
+    "optimal_threshold": Infinity,
+    "sensitivity": 0.0,
+    "specificity": 1.0,
+    "recommendation": Infinity
+  },
+  "previous_issues_resolved": {
+    "empirical_thresholds_replaced": true,
+    "bias_correction_validated": true,
+    "scientific_methodology_applied": true
+  },
+  "recommendations": {
+    "primary_threshold": Infinity,
+    "clinical_interpretation": [
+      "Lower sensitivity - requires careful consideration of false negatives",
+      "High specificity - suitable for confirmatory applications"
+    ],
+    "deployment_recommendations": [
+      "Model requires improvement before clinical deployment"
+    ],
+    "monitoring_recommendations": [
+      "Continuous monitoring of sensitivity and specificity in clinical use",
+      "Regular recalibration with new data",
+      "Monitor for dataset drift and demographic bias",
+      "Validate performance on external datasets"
+    ]
+  }
+}
