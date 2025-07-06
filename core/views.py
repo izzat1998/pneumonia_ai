@@ -128,7 +128,7 @@ class AnalysisAPIView(APIView):
                 analysis.save()
                 
                 # Return success response
-                response_serializer = AnalysisResultSerializer(analysis)
+                response_serializer = AnalysisResultSerializer(analysis, context={'request': request})
                 return Response(
                     {
                         'success': True,
@@ -200,7 +200,7 @@ class AnalysisViewSet(viewsets.ReadOnlyModelViewSet):
     def list(self, request):
         """List all analyses for current session"""
         queryset = self.get_queryset()
-        serializer = AnalysisListSerializer(queryset, many=True)
+        serializer = AnalysisListSerializer(queryset, many=True, context={'request': request})
         
         return Response({
             'count': queryset.count(),
@@ -211,7 +211,7 @@ class AnalysisViewSet(viewsets.ReadOnlyModelViewSet):
         """Get specific analysis result"""
         try:
             analysis = get_object_or_404(self.get_queryset(), pk=pk)
-            serializer = AnalysisResultSerializer(analysis)
+            serializer = AnalysisResultSerializer(analysis, context={'request': request})
             return Response(serializer.data)
         except Exception as e:
             return Response(

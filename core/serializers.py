@@ -56,12 +56,24 @@ class AnalysisResultSerializer(serializers.ModelSerializer):
     
     confidence_percentage = serializers.ReadOnlyField()
     is_pneumonia_detected = serializers.ReadOnlyField()
+    image_url = serializers.SerializerMethodField()
+    
+    def get_image_url(self, obj):
+        """Get the full URL for the image"""
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
     
     class Meta:
         model = AnalysisResult
         fields = [
             'id',
             'session_key',
+            'image',
+            'image_url',
             'original_filename',
             'file_size',
             'image_width',
@@ -101,12 +113,23 @@ class AnalysisListSerializer(serializers.ModelSerializer):
     
     confidence_percentage = serializers.ReadOnlyField()
     is_pneumonia_detected = serializers.ReadOnlyField()
+    image_url = serializers.SerializerMethodField()
+    
+    def get_image_url(self, obj):
+        """Get the full URL for the image"""
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
     
     class Meta:
         model = AnalysisResult
         fields = [
             'id',
             'original_filename',
+            'image_url',
             'prediction_class',
             'confidence_percentage',
             'is_pneumonia_detected',

@@ -271,10 +271,11 @@ class PneumoniaAnalyzer extends MedicalCore.UIComponent {
             const endTime = Date.now();
             const processingTime = analysis.processing_time ? analysis.processing_time * 1000 : endTime - startTime;
             
-            // Create analysis record matching Django format
+            // Create analysis record with normalized Django format
+            const normalizedAnalysis = this.normalizeAnalysisResult(analysis);
             const analysisRecord = {
                 ...task,
-                result: analysis,
+                result: normalizedAnalysis,
                 processingTime,
                 completedAt: endTime,
                 status: 'completed'
@@ -423,17 +424,20 @@ class PneumoniaAnalyzer extends MedicalCore.UIComponent {
         this.resultsContainer.style.display = 'block';
         
         // Show success notification
-        const diagnosis = result.prediction === 'PNEUMONIA' ? 'Pneumonia detected' : 'Normal chest X-ray';
+        const normalizedResult = this.normalizeAnalysisResult(result);
+        const diagnosis = normalizedResult.is_pneumonia_detected ? 'Pneumonia detected' : 'Normal chest X-ray';
+        const confidence = this.formatConfidencePercentage(normalizedResult);
         MedicalCore.notifications.success(
-            `Analysis complete: ${diagnosis} (${(result.confidence * 100).toFixed(1)}% confidence)`,
+            `Analysis complete: ${diagnosis} (${confidence}% confidence)`,
             { title: 'Analysis Results', duration: 8000 }
         );
     }
 
     generateResultHTML(result, processingTime, fileName) {
-        // Handle Django API response format
-        const isPneumonia = result.prediction_class === 'pneumonia' || result.is_pneumonia_detected;
-        const confidence = result.confidence_percentage || (result.confidence_score * 100).toFixed(1);
+        // Normalize Django API response format
+        const normalizedResult = this.normalizeAnalysisResult(result);
+        const isPneumonia = normalizedResult.is_pneumonia_detected;
+        const confidence = this.formatConfidencePercentage(normalizedResult);
         const cardClass = isPneumonia ? 'medical-card-danger' : 'medical-card-success';
         const iconClass = isPneumonia ? 'text-danger' : 'text-success';
         const statusIcon = isPneumonia ? '⚠️' : '✅';
@@ -455,6 +459,32 @@ class PneumoniaAnalyzer extends MedicalCore.UIComponent {
                 </div>
                 
                 <div class="medical-card-body">
+                    ${normalizedResult.image_url ? `
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <label class="medical-label">Original X-ray Image</label>
+                            <div class="medical-image-container">
+                                <img src="${normalizedResult.image_url}" 
+                                     alt="X-ray: ${fileName}" 
+                                     class="medical-image img-fluid" 
+                                     onload="window.medicalAnalyzer.handleImageLoad(this)"
+                                     onerror="window.medicalAnalyzer.handleImageError(this, '${fileName}')"
+                                     style="max-height: 300px;">
+                            </div>
+                        </div>
+                    </div>
+                    ` : `
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <label class="medical-label">Original X-ray Image</label>
+                            <div class="medical-image-error">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <div class="error-text">Image Not Available</div>
+                                <div class="error-details">The uploaded image could not be displayed</div>
+                            </div>
+                        </div>
+                    </div>
+                    `}
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
@@ -469,27 +499,27 @@ class PneumoniaAnalyzer extends MedicalCore.UIComponent {
                                 <div class="medical-progress mb-2">
                                     <div class="medical-progress-bar" style="width: ${confidence}%;"></div>
                                 </div>
-                                <small class="medical-caption">${this.getConfidenceDescription(result.confidence_score || confidence / 100)}</small>
+                                <small class="medical-caption">${this.getConfidenceDescription(normalizedResult.confidence_score)}</small>
                             </div>
                             
-                            ${result.raw_probabilities ? `
+                            ${normalizedResult.raw_probabilities ? `
                             <div class="mb-3">
                                 <label class="medical-label">Probability Breakdown</label>
                                 <div class="probability-bars">
                                     <div class="d-flex justify-content-between mb-1">
                                         <span>Normal:</span>
-                                        <span>${(result.raw_probabilities.normal * 100).toFixed(1)}%</span>
+                                        <span>${(normalizedResult.raw_probabilities.normal * 100).toFixed(1)}%</span>
                                     </div>
                                     <div class="medical-progress mb-2">
-                                        <div class="medical-progress-bar" style="width: ${result.raw_probabilities.normal * 100}%; background: var(--medical-success);"></div>
+                                        <div class="medical-progress-bar" style="width: ${normalizedResult.raw_probabilities.normal * 100}%; background: var(--medical-success);"></div>
                                     </div>
                                     
                                     <div class="d-flex justify-content-between mb-1">
                                         <span>Pneumonia:</span>
-                                        <span>${(result.raw_probabilities.pneumonia * 100).toFixed(1)}%</span>
+                                        <span>${(normalizedResult.raw_probabilities.pneumonia * 100).toFixed(1)}%</span>
                                     </div>
                                     <div class="medical-progress">
-                                        <div class="medical-progress-bar" style="width: ${result.raw_probabilities.pneumonia * 100}%; background: var(--medical-danger);"></div>
+                                        <div class="medical-progress-bar" style="width: ${normalizedResult.raw_probabilities.pneumonia * 100}%; background: var(--medical-danger);"></div>
                                     </div>
                                 </div>
                             </div>
@@ -505,16 +535,16 @@ class PneumoniaAnalyzer extends MedicalCore.UIComponent {
                             <div class="mb-3">
                                 <label class="medical-label">Model Information</label>
                                 <div class="model-info">
-                                    <div><strong>Version:</strong> ${result.model_version || 'Unknown'}</div>
-                                    <div><strong>Image Size:</strong> ${result.image_width || 'N/A'}×${result.image_height || 'N/A'}</div>
-                                    <div><strong>File Size:</strong> ${MedicalCore.utils.formatFileSize(result.file_size || 0)}</div>
+                                    <div><strong>Version:</strong> ${normalizedResult.model_version || 'Unknown'}</div>
+                                    <div><strong>Image Size:</strong> ${normalizedResult.image_width || 'N/A'}×${normalizedResult.image_height || 'N/A'}</div>
+                                    <div><strong>File Size:</strong> ${MedicalCore.utils.formatFileSize(normalizedResult.file_size || 0)}</div>
                                 </div>
                             </div>
                             
                             <div class="mb-3">
                                 <label class="medical-label">Medical Recommendation</label>
                                 <div class="medical-recommendation">
-                                    ${this.getRecommendation(result)}
+                                    ${this.getRecommendation(normalizedResult)}
                                 </div>
                             </div>
                         </div>
@@ -538,6 +568,51 @@ class PneumoniaAnalyzer extends MedicalCore.UIComponent {
                 </div>
             </div>
         `;
+    }
+
+    // Data normalization and validation helpers
+    normalizeAnalysisResult(result) {
+        if (!result) return null;
+        
+        // Normalize confidence values with fallbacks
+        const confidenceScore = this.safeNumber(result.confidence_score || result.confidence, 0);
+        const confidencePercentage = this.safeNumber(
+            result.confidence_percentage || (confidenceScore * 100), 
+            0
+        );
+        
+        // Normalize prediction values
+        const predictionClass = result.prediction_class || result.prediction || 'unknown';
+        const isPneumonia = predictionClass === 'pneumonia' || predictionClass === 'PNEUMONIA';
+        
+        return {
+            ...result,
+            // Standardized confidence fields
+            confidence_score: confidenceScore,
+            confidence_percentage: confidencePercentage,
+            confidence: confidenceScore, // Legacy compatibility
+            
+            // Standardized prediction fields  
+            prediction_class: predictionClass,
+            prediction: isPneumonia ? 'PNEUMONIA' : 'NORMAL', // Legacy compatibility
+            is_pneumonia_detected: isPneumonia,
+            
+            // Safe processing time
+            processing_time: this.safeNumber(result.processing_time, 0)
+        };
+    }
+    
+    safeNumber(value, fallback = 0) {
+        const num = parseFloat(value);
+        return isNaN(num) || !isFinite(num) ? fallback : num;
+    }
+    
+    formatConfidencePercentage(result) {
+        const normalized = this.normalizeAnalysisResult(result);
+        if (!normalized) return '0.0';
+        
+        const percentage = normalized.confidence_percentage;
+        return this.safeNumber(percentage, 0).toFixed(1);
     }
 
     getConfidenceDescription(confidence) {
@@ -570,7 +645,8 @@ class PneumoniaAnalyzer extends MedicalCore.UIComponent {
     updateConfidenceDisplay(result) {
         if (!this.confidenceDisplay) return;
         
-        const confidence = (result.confidence * 100).toFixed(1);
+        const normalizedResult = this.normalizeAnalysisResult(result);
+        const confidence = this.formatConfidencePercentage(normalizedResult);
         this.confidenceDisplay.innerHTML = `
             <div class="confidence-meter">
                 <div class="confidence-bar" style="width: ${confidence}%;"></div>
@@ -635,27 +711,35 @@ class PneumoniaAnalyzer extends MedicalCore.UIComponent {
             return;
         }
         
-        const historyHtml = this.analysisHistory.map(record => `
+        const historyHtml = this.analysisHistory.map(record => {
+            // Normalize the result data to handle Django API format
+            const normalizedResult = this.normalizeAnalysisResult(record.result);
+            const confidencePercentage = this.formatConfidencePercentage(normalizedResult);
+            const isPneumonia = normalizedResult?.is_pneumonia_detected || false;
+            const prediction = isPneumonia ? 'PNEUMONIA' : 'NORMAL';
+            
+            return `
             <div class="history-item medical-card mb-3" data-id="${record.id}">
                 <div class="medical-card-body">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <h6 class="mb-1">${record.fileName}</h6>
+                            <h6 class="mb-1">${record.fileName || 'Unknown File'}</h6>
                             <p class="medical-caption mb-2">
                                 ${new Date(record.completedAt).toLocaleString()}
                             </p>
-                            <span class="badge ${record.result.prediction === 'PNEUMONIA' ? 'bg-danger' : 'bg-success'}">
-                                ${record.result.prediction}
+                            <span class="badge ${isPneumonia ? 'bg-danger' : 'bg-success'}">
+                                ${prediction}
                             </span>
                         </div>
                         <div class="text-end">
-                            <div class="medical-stat-value">${(record.result.confidence * 100).toFixed(1)}%</div>
+                            <div class="medical-stat-value">${confidencePercentage}%</div>
                             <div class="medical-stat-label">Confidence</div>
                         </div>
                     </div>
                 </div>
             </div>
-        `).join('');
+            `;
+        }).join('');
         
         this.historyList.innerHTML = historyHtml;
     }
@@ -666,9 +750,10 @@ class PneumoniaAnalyzer extends MedicalCore.UIComponent {
         if (analysisRecord.status === 'completed') {
             this.sessionStats.successfulAnalyses++;
             
-            // Update averages - handle Django format
-            const result = analysisRecord.result;
-            const newConfidence = result.confidence_score || (result.confidence_percentage / 100);
+            // Normalize result data for consistent processing
+            const normalizedResult = this.normalizeAnalysisResult(analysisRecord.result);
+            const newConfidence = normalizedResult.confidence_score;
+            
             this.sessionStats.averageConfidence = 
                 (this.sessionStats.averageConfidence * (this.sessionStats.successfulAnalyses - 1) + newConfidence) / 
                 this.sessionStats.successfulAnalyses;
@@ -677,9 +762,8 @@ class PneumoniaAnalyzer extends MedicalCore.UIComponent {
                 (this.sessionStats.averageProcessingTime * (this.sessionStats.successfulAnalyses - 1) + analysisRecord.processingTime) / 
                 this.sessionStats.successfulAnalyses;
             
-            // Update diagnosis counts - handle Django format
-            const isPneumonia = result.prediction_class === 'pneumonia' || result.is_pneumonia_detected;
-            if (isPneumonia) {
+            // Update diagnosis counts using normalized format
+            if (normalizedResult.is_pneumonia_detected) {
                 this.sessionStats.pneumoniaDetected++;
             } else {
                 this.sessionStats.normalResults++;
@@ -766,7 +850,12 @@ class PneumoniaAnalyzer extends MedicalCore.UIComponent {
             const stats = localStorage.getItem('pneumonia_session_stats');
             
             if (history) {
-                this.analysisHistory = JSON.parse(history);
+                const rawHistory = JSON.parse(history);
+                // Normalize any legacy data formats
+                this.analysisHistory = rawHistory.map(record => ({
+                    ...record,
+                    result: this.normalizeAnalysisResult(record.result)
+                }));
                 this.updateHistoryDisplay();
             }
             
@@ -817,8 +906,15 @@ class PneumoniaAnalyzer extends MedicalCore.UIComponent {
 
             // Display original image (use uploaded file as fallback)
             if (originalImage) {
-                originalImage.src = result.original_image_url || '#';
-                originalImage.alt = `Original X-ray: ${fileName}`;
+                if (result.image_url) {
+                    originalImage.src = result.image_url;
+                    originalImage.alt = `Original X-ray: ${fileName}`;
+                    originalImage.onload = () => this.handleImageLoad(originalImage);
+                    originalImage.onerror = () => this.handleImageError(originalImage, fileName);
+                } else {
+                    originalImage.src = '#';
+                    originalImage.alt = 'Image not available';
+                }
             }
 
             // Display heatmap if available
@@ -905,6 +1001,102 @@ class PneumoniaAnalyzer extends MedicalCore.UIComponent {
         }
     }
 
+    handleImageLoad(imageElement) {
+        // Remove loading class if present
+        imageElement.classList.remove('medical-image-loading');
+        
+        // Add a subtle fade-in animation
+        imageElement.style.opacity = '0';
+        imageElement.style.transition = 'opacity 0.3s ease-in-out';
+        setTimeout(() => {
+            imageElement.style.opacity = '1';
+        }, 50);
+
+        console.log('Image loaded successfully:', imageElement.src);
+    }
+
+    handleImageError(imageElement, fileName) {
+        console.error('Failed to load image:', imageElement.src);
+        
+        // Replace the image with an error placeholder
+        const container = imageElement.parentElement;
+        if (container) {
+            container.innerHTML = `
+                <div class="medical-image-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <div class="error-text">Image Load Failed</div>
+                    <div class="error-details">Could not display X-ray image for ${fileName}</div>
+                    <button class="medical-btn medical-btn-sm medical-btn-outline mt-2" onclick="window.medicalAnalyzer.retryImageLoad('${imageElement.src}', this.parentElement)">
+                        <i class="fas fa-redo"></i> Retry
+                    </button>
+                </div>
+            `;
+        }
+
+        // Show user notification
+        MedicalCore.notifications.warning('Image could not be loaded. Please check your connection and try again.', {
+            title: 'Image Error'
+        });
+    }
+
+    retryImageLoad(imageSrc, errorContainer) {
+        console.log('Retrying image load:', imageSrc);
+        
+        // Show loading state
+        errorContainer.innerHTML = `
+            <div class="medical-image-error">
+                <i class="fas fa-spinner fa-spin"></i>
+                <div class="error-text">Retrying...</div>
+                <div class="error-details">Loading image...</div>
+            </div>
+        `;
+
+        // Create new image element
+        const img = document.createElement('img');
+        img.src = imageSrc + '?retry=' + Date.now(); // Add cache buster
+        img.alt = 'X-ray Image';
+        img.className = 'medical-image img-fluid medical-image-loading';
+        img.style.maxHeight = '300px';
+        
+        img.onload = () => {
+            errorContainer.innerHTML = '';
+            errorContainer.appendChild(img);
+            this.handleImageLoad(img);
+        };
+        
+        img.onerror = () => {
+            errorContainer.innerHTML = `
+                <div class="medical-image-error">
+                    <i class="fas fa-times-circle"></i>
+                    <div class="error-text">Image Permanently Unavailable</div>
+                    <div class="error-details">The image file may be corrupted or deleted</div>
+                </div>
+            `;
+        };
+    }
+
+    // Data migration and cleanup helper
+    clearLegacyData() {
+        try {
+            localStorage.removeItem('pneumonia_analysis_history');
+            localStorage.removeItem('pneumonia_session_stats');
+            this.analysisHistory = [];
+            this.sessionStats = {
+                totalAnalyses: 0,
+                successfulAnalyses: 0,
+                pneumoniaDetected: 0,
+                normalResults: 0,
+                averageConfidence: 0,
+                averageProcessingTime: 0
+            };
+            this.updateHistoryDisplay();
+            this.updateStatsDisplay();
+            MedicalCore.notifications.success('Analysis history cleared and reset', { title: 'Data Reset' });
+        } catch (error) {
+            console.warn('Could not clear legacy data:', error);
+        }
+    }
+
     destroy() {
         this.saveAnalysisHistory();
         super.destroy();
@@ -913,3 +1105,34 @@ class PneumoniaAnalyzer extends MedicalCore.UIComponent {
 
 // Make available globally
 window.PneumoniaAnalyzer = PneumoniaAnalyzer;
+
+// Emergency data cleanup utility for users experiencing NaN% issues
+// Users can run this in their browser console: fixPneumoniaData()
+window.fixPneumoniaData = function() {
+    try {
+        // Clear problematic localStorage data
+        localStorage.removeItem('pneumonia_analysis_history');
+        localStorage.removeItem('pneumonia_session_stats');
+        
+        console.log('✅ Pneumonia analysis data cleared successfully!');
+        console.log('🔄 Please refresh the page to see the fix in action.');
+        console.log('📝 The NaN% confidence display issue should now be resolved.');
+        
+        // Show user-friendly notification if possible
+        if (window.MedicalCore && window.MedicalCore.notifications) {
+            window.MedicalCore.notifications.success(
+                'Analysis data cleared! Please refresh the page.', 
+                { title: 'Data Fix Applied', duration: 10000 }
+            );
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('❌ Failed to clear data:', error);
+        return false;
+    }
+};
+
+// Add helpful console message for users experiencing issues
+console.log('%c🩺 PneumoniaAI Debug Helper', 'color: #2c5f7f; font-size: 16px; font-weight: bold;');
+console.log('%cIf you see "NaN%" in confidence values, run: fixPneumoniaData()', 'color: #666; font-size: 12px;');
